@@ -1,0 +1,7 @@
+[project]
+name = "minimal-ddpm"
+version = "0.1.0"
+description = "A minimal implementation of Denoising Diffusion Probabilistic Models for self-study"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []

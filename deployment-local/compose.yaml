@@ -1,0 +1,10 @@
+services:
+  minimal_ddpm:
+    hostname: minimal_ddpm
+    build:
+      context: ../minimal_ddpm/
+      dockerfile: Dockerfile.local
+    volumes:
+      - ../:/usr/local/src/minimal-diffusion/
+    tty: true
+    working_dir: /usr/local/src/minimal-diffusion/minimal_ddpm/
