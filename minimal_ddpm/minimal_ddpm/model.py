@@ -29,7 +29,7 @@ def train(
     result_dir: os.PathLike,
     target_distribution: MixtureGaussian,  # Target distribution
     model: MinimalDdpm,
-    s: float = 1.0,  # Terminal standard deviation
+    s: float = 2.0,  # Terminal standard deviation
     dt: float = 0.01,  # Step size
     batch_size: int = 10000,
     epoch_num: int = 10000,
@@ -77,27 +77,48 @@ def _eval(
 ):
     # Sample the distributions
     target_samples = target_distribution.sample(sample_num)
-    model_samples = _reverse(model, s, dt, sample_num)
+    diffusion_samples = _diffuse(target_distribution, s, dt, sample_num)
+    reverse_samples = _reverse(model, target_distribution.mean(), s, dt, sample_num)
     # Draw the histograms
-    domain = (min(min(target_samples), min(model_samples)), max(max(target_samples), max(model_samples)))
+    domain = (
+        min(min(target_samples), min(diffusion_samples), min(reverse_samples)),
+        max(max(target_samples), max(diffusion_samples), max(reverse_samples)),
+    )
     target_hist, _ = np.histogram(target_samples, bins=bin_num, range=domain)
-    model_hist, _ = np.histogram(model_samples, bins=bin_num, range=domain)
-    max_hist = max(max(target_hist), max(model_hist))
-    target_image = plot_histogram(target_samples, bin_num, domain=domain, top=max_hist)
-    model_image = plot_histogram(model_samples, bin_num, domain=domain, top=max_hist)
-    image = Image.fromarray(np.hstack([target_image, model_image]))
+    diffusion_hist, _ = np.histogram(diffusion_samples, bins=bin_num, range=domain)
+    reverse_hist, _ = np.histogram(reverse_samples, bins=bin_num, range=domain)
+    max_hist = max(max(target_hist), max(diffusion_hist), max(reverse_hist))
+    target_image = plot_histogram(target_samples, bin_num, domain=domain, top=max_hist, title="Target")
+    diffusion_image = plot_histogram(diffusion_samples, bin_num, domain=domain, top=max_hist, title="Diffusion")
+    reverse_image = plot_histogram(reverse_samples, bin_num, domain=domain, top=max_hist, title="Reverse")
+    image = Image.fromarray(np.hstack([target_image, diffusion_image, reverse_image]))
     image_draw = ImageDraw.Draw(image)
     image_draw.text((10, 10), f"Epoch: {epoch}", fill="black", font_size=20)
     image.save(result_dir / f"{image_name}.png")
 
 
-def _reverse(
-    model: MinimalDdpm,
+def _diffuse(
+    target_distribution: MixtureGaussian,
     s: float,
     dt: float,
     batch_size: int,
 ) -> list[float]:
-    xt_batch = np.random.normal(scale=s, size=batch_size)
+    xt_batch = np.array(target_distribution.sample(batch_size))
+    for _ in np.arange(0.0, 1.0, dt):
+        n_batch = np.random.normal(scale=s * math.sqrt(dt), size=batch_size)  # Gaussian noise
+        xt_batch += n_batch
+    samples = xt_batch.tolist()
+    return samples
+
+
+def _reverse(
+    model: MinimalDdpm,
+    m: float,
+    s: float,
+    dt: float,
+    batch_size: int,
+) -> list[float]:
+    xt_batch = np.random.normal(loc=m, scale=s, size=batch_size)
     with torch.no_grad():
         xt_batch = torch.tensor(xt_batch, dtype=torch.float32).to(_DEVICE).unsqueeze(1)
         for t in np.arange(1.0, 0.0, -dt):
