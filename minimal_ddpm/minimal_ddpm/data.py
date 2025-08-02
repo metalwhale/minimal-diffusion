@@ -21,7 +21,9 @@ class MixtureGaussian:
             self._parameters.append((m, s))
             assert isinstance(w, float)
             self._weights.append(w)
-        assert sum(self._weights) == 1.0
+        weights_sum = sum(self._weights)
+        for i, weight in enumerate(self._weights):
+            self._weights[i] = weight / weights_sum
 
     def sample(self, size: int) -> list[float]:
         samples = []
@@ -31,18 +33,24 @@ class MixtureGaussian:
             samples.append(np.random.normal(loc=m, scale=s))
         return samples
 
+    def mean(self) -> float:
+        return sum([m * w for (m, *_), w in zip(self._parameters, self._weights)])
+
 
 def plot_histogram(
     samples: list[float],
     bin_num: int,
     domain: tuple[float, float] | None = None,
     top: float | None = None,
+    title: str | None = None,
 ) -> np.ndarray:
     if domain is None:
         domain = (min(samples), max(samples))
     plt.hist(samples, bins=bin_num, range=domain)
     if top is not None:
         plt.ylim(top=top)
+    if title is not None:
+        plt.title(title, loc="center")
     buffer = io.BytesIO()
     plt.savefig(buffer, format="png")
     plt.clf()
