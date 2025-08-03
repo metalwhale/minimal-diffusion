@@ -49,7 +49,7 @@ def train(
                 xt = x0 + np.random.normal(scale=s * math.sqrt(t))
                 xt_next = xt + np.random.normal(scale=s * math.sqrt(dt))
                 x_batch.append([xt_next, t + dt])
-                y_batch.append(xt)
+                y_batch.append(x0)
             x_batch = torch.tensor(x_batch).to(_DEVICE)
             y_batch = torch.tensor(y_batch).to(_DEVICE)
             pred = model(x_batch).squeeze(1)
@@ -123,7 +123,8 @@ def _reverse(
         xt_batch = torch.tensor(xt_batch, dtype=torch.float32).to(_DEVICE).unsqueeze(1)
         for t in np.arange(1.0, 0.0, -dt):
             t_batch = torch.tensor([t for _ in range(batch_size)], dtype=torch.float32).to(_DEVICE).unsqueeze(1)
-            xt_prev_mean_batch = model(torch.cat((xt_batch, t_batch), dim=1))
+            x0_mean_batch = model(torch.cat((xt_batch, t_batch), dim=1))
+            xt_prev_mean_batch = dt / t * x0_mean_batch + (1 - dt / t) * xt_batch
             n_batch = np.random.normal(scale=s * math.sqrt(dt), size=batch_size)  # Gaussian noise
             n_batch = torch.tensor(n_batch, dtype=torch.float32).to(_DEVICE).unsqueeze(1)
             xt_batch = xt_prev_mean_batch + n_batch
